@@ -1,0 +1,4 @@
+CMakeLists.txt
+mygzip
+mygzip.o
+.idea/
