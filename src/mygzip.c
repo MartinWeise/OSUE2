@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <memory.h>
+#include <sys/wait.h>
 
 /*
  *  ---------                ---------
@@ -43,12 +44,13 @@
  * global variables:
  * @param argc The argument counter.
  * @param argv The argument vector.
- * @return Returns EXIT_SUCCESS when operated like required.
+ * @return EXIT_SUCCESS | EXITFAILURE when operated like required.
  */
 int main(int argc, char **argv) {
     char *filename;
     pid_t pid1, pid2;
     int pipe1[2], pipe2[2];
+    int status1;
     //        ^ 0 = read end
     //          1 = write end
     FILE *file, *fdpipe;
@@ -66,6 +68,7 @@ int main(int argc, char **argv) {
             // child 1
             printf ("child 1.\n");
             /* close write end */
+            exit (EXIT_SUCCESS);
             break;
         default:
             // parent
@@ -75,6 +78,7 @@ int main(int argc, char **argv) {
                 case 0:
                     // child 2
                     printf ("child 2.\n");
+                    exit (EXIT_SUCCESS);
                     break;
                 default:
                     // still parent
@@ -83,6 +87,9 @@ int main(int argc, char **argv) {
             }
             // Parent
             printf("Parent.\n");
+            if (wait(&status1) == -1) {
+                error_exit ("Couldn't wait.");
+            }
             break;
     }
 
