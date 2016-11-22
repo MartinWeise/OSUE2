@@ -3,18 +3,24 @@ DEFS=-D_XOPEN_SOURCE=500 -D_BSD_SOURCE
 CFLAGS=-Wall -g -std=c99 -pedantic $(DEFS)
 #LDFLAGS=-lcrypt
 
-all: mygzip
+all: src/mygzip
 
-mygzip: mygzip.o
+src/mygzip: src/mygzip.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
-mygzip.o: mygzip.c
+src/mygzip.o: src/mygzip.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: mygzip
-	./test.sh
+test: src/mygzip
+	sh test/test.sh
+
+run: all
+	src/mygzip
+
+doxygen: all
+	sh doc/batch.sh
 
 clean:
-	rm -f mygzip mygzip.o
+	rm -f src/mygzip src/mygzip.o
 
 .PHONY: clean

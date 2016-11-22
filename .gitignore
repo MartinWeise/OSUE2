@@ -2,3 +2,5 @@ CMakeLists.txt
 mygzip
 mygzip.o
 .idea/
+doc/html/
+doc/latex/
