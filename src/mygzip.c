@@ -21,8 +21,6 @@
 
 char *progname;
 
-#define MESSAGE "hello world"
-
 /* === Prototypes === */
 
 /**
@@ -46,7 +44,6 @@ void parse_args(int argc, char **argv, char **filename);
  */
 int main(int argc, char **argv) {
     char *filename = NULL;
-    FILE *file;
     pid_t pid;
     int pipe1[2], pipe2[2];
     //        ^ 0 = read end
@@ -66,43 +63,49 @@ int main(int argc, char **argv) {
             case 0:
                 if (i == 0) {
                     // child
-                    execlp("gzip", "gzip", "-cf", (char *)NULL);
-                    close (pipe1[0]);
-                    if (dup2 (pipe1[1], STDIN_FILENO) < 0) {
+                    close (pipe1[1]);
+                    if (dup2 (pipe1[0], STDIN_FILENO) < 0) {
                         error_exit ("Could not apply stdin to pipe1.");
                     }
-                    close (pipe2[1]);
-                    if (dup2 (pipe2[0], STDOUT_FILENO) < 0) {
+                    close (pipe1[0]);
+                    close (pipe2[0]);
+                    if (dup2 (pipe2[1], STDOUT_FILENO) < 0) {
                         error_exit ("Could not apply stdout to pipe2.");
                     }
-                    close (pipe1[1]);
-                    close (pipe2[0]);
+                    close (pipe2[1]);
+                    execlp("gzip", "gzip", "-cf", (char *)NULL);
                     /* stdout is closed indirect */
-//                    exit (EXIT_SUCCESS);
+                    exit (EXIT_SUCCESS);
                 } else {
                     // child 2
+                    char buffer[1024];
 //                    close (pipe1[0]);
                     close (pipe1[1]);
                     close (pipe2[0]);
                     close (pipe2[1]);
-                    char buffer[1024];
-
+                    FILE *reader = fdopen(pipe2[0], "rb");
+                    filename = "t1";
                     if (filename == NULL) {
-                        file = stdout;
-                        while (read(pipe1[0], buffer, sizeof buffer) > 0) {
-                            fprintf(file, "--> %s\n", buffer);
+                        FILE *file = stdout;
+                        while(fgets(buffer, sizeof buffer, reader) != NULL) {
+                            fprintf(file, "%s", buffer);
+                            fflush(file);
                         }
+                        fclose (file);
                     } else {
                         // append binary
-                        file = fopen(filename, "wb");
-                        while (read(pipe1[0], buffer, sizeof buffer) > 0) {
-                            fprintf(file, "--> %s\n", buffer);
-                            fprintf(stderr, "--> %s\n", buffer);
+                        FILE *file;
+                        if ((file = fopen(filename, "wb+")) == NULL) {
+                            error_exit ("Couldn't open file.");
                         }
-                        fprintf (file, "%s", "nope");
+                        while(fgets(buffer, sizeof buffer, reader) != NULL) {
+                            fprintf(stderr, "works\n");
+                            fwrite(&buffer, sizeof(char), strlen("hello")+1, file);
+                            fflush(file);
+                        }
+                        fclose (file);
                     }
                     close (pipe2[0]);
-                    fclose (file);
                     exit (EXIT_SUCCESS);
                 }
                 exit(EXIT_SUCCESS);
@@ -125,7 +128,7 @@ int main(int argc, char **argv) {
                     close (pipe2[0]);
                     close (pipe2[1]);
                 }
-                //wait(NULL); // important
+                wait(NULL);
         }
     }
 

@@ -15,7 +15,7 @@ test: src/mygzip
 	sh test/test.sh
 
 run: all
-	src/mygzip
+	src/mygzip t1
 
 doxygen: all
 	sh doc/batch.sh
