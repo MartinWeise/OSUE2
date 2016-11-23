@@ -11,140 +11,158 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
 #include <memory.h>
 #include <sys/wait.h>
 #include <stdarg.h>
+#include "mygzip.h"
 
-// TODO: gunzip geht noch nicht
+#define BUFFER_SIZE 512
 
-char *progname;
+static char *progname = "mygzip";
+static char *filename = NULL;
+static FILE *output = NULL;
+static FILE *input_writer = NULL;
+static FILE *output_reader = NULL;
+static int pipe1[2];
+static int pipe2[2];
+static pid_t child1;
+static pid_t child2;
 
-/* === Prototypes === */
-
-/**
- * @copyright OS UE Team (server.c)
- * @param fmt
- */
-void error_exit (const char *fmt, ...);
-
-void usage();
-
-void parse_args(int argc, char **argv, char **filename);
-
-/**
- * Program entry point.
- * @brief The program executed starts here. TODO
- * @details TODO
- * global variables:
- * @param argc The argument counter.
- * @param argv The argument vector.
- * @return EXIT_SUCCESS | EXITFAILURE when operated like required.
- */
 int main(int argc, char **argv) {
-    char *filename = NULL;
-    pid_t pid;
-    int pipe1[2], pipe2[2];
-    //        ^ 0 = read end
-    //          1 = write end
 
-    parse_args(argc, argv, &filename);
-
-    if(pipe(pipe1) < 0 || pipe(pipe2) < 0){
-        error_exit ("Can't create pipes.");
+    /* check arguments of program */
+    progname = argv[0];
+    output = stdout;
+    if (argc > 2) {
+        usage();
     }
-
-    for (int i = 0; i < 2; i++) {
-        printf("Child: %d\n", i+1);
-        switch (pid = fork()) {
-            case -1:
-                error_exit("Cannot fork!");
-            case 0:
-                if (i == 0) {
-                    // child
-                    close (pipe1[1]);
-                    if (dup2 (pipe1[0], STDIN_FILENO) < 0) {
-                        error_exit ("Could not apply stdin to pipe1.");
-                    }
-                    close (pipe1[0]);
-                    close (pipe2[0]);
-                    if (dup2 (pipe2[1], STDOUT_FILENO) < 0) {
-                        error_exit ("Could not apply stdout to pipe2.");
-                    }
-                    close (pipe2[1]);
-                    execlp("gzip", "gzip", "-cf", (char *)NULL);
-                    /* stdout is closed indirect */
-                    exit (EXIT_SUCCESS);
-                } else {
-                    // child 2
-                    char buffer[1024];
-//                    close (pipe1[0]);
-                    close (pipe1[0]);
-                    close (pipe1[1]);
-                    close (pipe2[1]);
-                    FILE *reader = fdopen(pipe2[0], "rb");
-                    if (filename == NULL) {
-                        FILE *file = stdout;
-                        while(fgets(buffer, sizeof buffer, reader) != NULL) {
-                            fprintf(file, "%s", buffer);
-                            fflush(file);
-                        }
-                        fclose (file);
-                    } else {
-                        // append binary
-                        FILE *file;
-                        if ((file = fopen(filename, "wb+")) == NULL) {
-                            error_exit ("Couldn't open file.");
-                        }
-                        while(fgets(buffer, sizeof buffer, reader) != NULL) {
-                            fprintf(stderr, "works\n");
-                            fwrite(&buffer, sizeof(char), strlen("hello")+1, file);
-                            fflush(file);
-                        }
-                        fclose (file);
-                    }
-                    close (pipe2[0]);
-                    exit (EXIT_SUCCESS);
-                }
-                exit(EXIT_SUCCESS);
-                break;
-            default:
-                // parent
-                if (i == 0) {
-                    // child 1
-                    // note: close (pipe1[0]) = read end would affect childs!
-                    char buffer[1024];
-                    /* read data from stdin */
-                    while(fgets(buffer, sizeof buffer, stdin) != NULL) {
-                        fprintf(stdout, "Read: %s", buffer);
-                        write(pipe1[1], buffer, strlen(buffer)+1);
-                    }
-                    close (pipe1[1]);
-                    /* write data to first pipe (gzip) */
-                } else {
-                    // from child 2
-                    close (pipe2[0]);
-                    close (pipe2[1]);
-                }
-                wait(NULL);
+    if (argc == 2) {
+        filename = argv[1];
+        /* try open the file */
+        if ((output = fopen(filename, "r")) == NULL) {
+            error_exit("Couldn't open the file %s.", filename);
         }
     }
+
+    /* create pipes */
+    if (pipe(&pipe1[0]) == -1) {
+        error_exit("Couldn't create first pipe.");
+    }
+    if (pipe(&pipe2[0]) == -1) {
+        error_exit("Couldn't create second pipe.");
+    }
+
+    /* fork for second child */
+    switch (child2 = fork()) {
+        case -1:
+            error_exit ("Couldn't fork second child.");
+            break;
+        case 0:
+            // child 2
+            DEBUG("Child 2 was born.\n");
+            close (pipe2[1]);
+
+            if ((output_reader = fdopen(pipe2[0], "r")) == NULL) {
+                error_exit("Couldn't fdopen pipe2.");
+            }
+
+            copy_contents(output_reader, output);
+
+            if (fclose(output) == EOF) {
+                error_exit("Couldn't close output file.");
+            }
+            fclose (output_reader);
+            close (pipe2[0]);
+
+            exit (EXIT_SUCCESS);
+            break;
+        default:
+            // parent
+            break;
+    }
+
+    /* fork for first child */
+    switch (child1 = fork()) {
+        case -1:
+            error_exit ("Couldn't fork first child.");
+            break;
+        case 0:
+            // child 1
+            DEBUG("Child 1 was born.\n");
+            close (pipe1[1]);
+            close (pipe2[0]);
+            if (dup2(pipe1[0], fileno(stdin)) == -1) {
+                error_exit("Couldn't bind stdin to pipe1.");
+            }
+            if (dup2(pipe2[1], fileno(stdout)) == -1) {
+                error_exit("Couldn't bind stdin to pipe1.");
+            }
+            DEBUG("Starting GZIP.\n");
+            execlp("gzip", "gzip", "-cf", (char *) 0);
+            error_exit("Couldn't execute with execlp.");
+            break;
+        default:
+            // parent
+            break;
+    }
+
+    /* parent process exclusive */
+    if (getpid() == child1 || getpid() == child2) {
+        error_exit("Something went wrong. Child ran away to parent section.");
+    }
+
+    DEBUG("pid: %d\n",getpid());
+
+    close (pipe1[0]);
+    close (pipe2[0]);
+    close (pipe2[1]);
+
+    if ((input_writer = fdopen(pipe1[1], "w")) == NULL) {
+        error_exit("Couldn't open first pipe for writing.");
+    }
+    copy_contents(stdin, input_writer);
+
+    if (fclose (input_writer) == EOF) {
+        error_exit("Couldn't close input writer.");
+    }
+    input_writer = NULL;
+    close (pipe1[1]);
+
+    /* wait for children and check their exit codes */
 
     return EXIT_SUCCESS;
 }
 
-void parse_args (int argc, char **argv, char **filename) {
-    if (argc > 2) {
-        usage();
+static void copy_contents (FILE *from, FILE *to) {
+    uint8_t buffer[BUFFER_SIZE];
+    int length;
+
+    while ((length = fread(&buffer, sizeof buffer[0], BUFFER_SIZE, from)) == BUFFER_SIZE) {
+        if ( fwrite(&buffer, sizeof (buffer[0]), BUFFER_SIZE, to) < BUFFER_SIZE) {
+            error_exit("Couldn't write to target.");
+        }
     }
-    progname = argv[0];
-    if (argc == 2) {
-        *filename = argv[1];
+    /* check for errors in stream */
+    if (ferror(from) != 0) {
+        error_exit("Error in source stream.");
     }
+
+    /* got EOF but continue to write last bytes */
+    if (fwrite(&buffer, sizeof buffer[0], length, to) < length) {
+        error_exit("Couldn't write to target.");
+    }
+
+    /* now force write of buffered data */
+    if (fflush(to) == EOF) {
+        error_exit("Couldn't write buffered data with fflush.");
+    }
+
 }
 
-void error_exit (const char *fmt, ...) {
+static void error_exit (const char *fmt, ...) {
     va_list ap;
 
     (void) fprintf(stderr, "%s: ", progname);
@@ -157,9 +175,30 @@ void error_exit (const char *fmt, ...) {
         (void) fprintf(stderr, ": %s", strerror(errno));
     }
     (void) fprintf(stderr, "\n");
+
+    DEBUG("Shutting down now.\n");
+    cleanup_resources();
+    exit (EXIT_FAILURE);
 }
 
-void usage() {
+static void usage(void) {
     fprintf (stderr, "USAGE: %s [file]\n", progname);
     exit (EXIT_FAILURE);
+}
+
+static void cleanup_resources(void) {
+    DEBUG("Freeing resources\n");
+    if (output != NULL) {
+        fclose(output);
+    }
+    if (input_writer != NULL) {
+        fclose (input_writer);
+    }
+    if (output_reader != NULL) {
+        fclose (input_writer);
+    }
+    close(pipe1[0]);
+    close(pipe1[1]);
+    close(pipe2[0]);
+    close(pipe2[1]);
 }

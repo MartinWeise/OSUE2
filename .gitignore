@@ -7,3 +7,6 @@ doc/latex/
 solution
 solution.c
 sandbox.c
+sandbox
+*gz
+*bin

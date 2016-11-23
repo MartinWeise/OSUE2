@@ -1,5 +1,5 @@
 CC=gcc
-DEFS=-D_XOPEN_SOURCE=500 -D_BSD_SOURCE
+DEFS=-D_XOPEN_SOURCE=500 -D_BSD_SOURCE -DENDEBUG
 CFLAGS=-Wall -g -std=c99 -pedantic $(DEFS)
 #LDFLAGS=-lcrypt
 
@@ -11,11 +11,11 @@ src/mygzip: src/mygzip.o
 src/mygzip.o: src/mygzip.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: src/mygzip
+test: all
 	sh test/test.sh
 
 run: all
-	src/mygzip t1.gz
+	src/mygzip
 
 doxygen: all
 	sh doc/batch.sh
