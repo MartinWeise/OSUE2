@@ -17,20 +17,7 @@
 #include <sys/wait.h>
 #include <stdarg.h>
 
-/*
- *  ---------                ---------
- * | Parent  |              | Child   |
- * | pipe[0] |<=========    | pipe[0] |<~~~
- * | pipe[1] |>~       =    | pipe[1] |>= ~
- *  ---------  ~       =     ---------  = ~
- *             ~       =     ============ ~
- *    ~~~~~~~~~~       ======x========    ~
- *    ~ ======================       =    ~
- *    ~ =  _______________________   =    ~
- *    ~ =>/                    /==\===    ~
- *    ~~>|                    |~~~|~~~~~~~~
- *        .___________________\___/
- */
+// TODO: irgendwo ist ein close während gzip ausgeführt wird
 
 char *progname;
 
@@ -79,35 +66,43 @@ int main(int argc, char **argv) {
             case 0:
                 if (i == 0) {
                     // child
+                    execlp("gzip", "gzip", "-cf", (char *)NULL);
                     close (pipe1[0]);
                     if (dup2 (pipe1[1], STDIN_FILENO) < 0) {
                         error_exit ("Could not apply stdin to pipe1.");
                     }
-//                    write (pipe1[1], "hello", sizeof("hello")+1);
                     close (pipe2[1]);
                     if (dup2 (pipe2[0], STDOUT_FILENO) < 0) {
                         error_exit ("Could not apply stdout to pipe2.");
                     }
+                    close (pipe1[1]);
+                    close (pipe2[0]);
                     /* stdout is closed indirect */
-                    execlp("gzip", "gzip", "-cf", (char *)NULL);
 //                    exit (EXIT_SUCCESS);
                 } else {
                     // child 2
-                    close (pipe1[0]);
+//                    close (pipe1[0]);
                     close (pipe1[1]);
+                    close (pipe2[0]);
                     close (pipe2[1]);
                     char buffer[1024];
 
                     if (filename == NULL) {
                         file = stdout;
-                        fprintf(file, "--->output\n");
+                        while (read(pipe1[0], buffer, sizeof buffer) > 0) {
+                            fprintf(file, "--> %s\n", buffer);
+                        }
                     } else {
                         // append binary
-                        file = fopen(filename, "ab");
-                        while (read(pipe2[0], buffer, sizeof buffer) < 0) {
-                            fprintf (file, "%s", buffer);
+                        file = fopen(filename, "wb");
+                        while (read(pipe1[0], buffer, sizeof buffer) > 0) {
+                            fprintf(file, "--> %s\n", buffer);
+                            fprintf(stderr, "--> %s\n", buffer);
                         }
+                        fprintf (file, "%s", "nope");
                     }
+                    close (pipe2[0]);
+                    fclose (file);
                     exit (EXIT_SUCCESS);
                 }
                 exit(EXIT_SUCCESS);
@@ -130,7 +125,7 @@ int main(int argc, char **argv) {
                     close (pipe2[0]);
                     close (pipe2[1]);
                 }
-                wait(NULL); // important
+                //wait(NULL); // important
         }
     }
 
