@@ -17,7 +17,7 @@
 #include <sys/wait.h>
 #include <stdarg.h>
 
-// TODO: irgendwo ist ein close während gzip ausgeführt wird
+// TODO: gunzip geht noch nicht
 
 char *progname;
 
@@ -84,7 +84,6 @@ int main(int argc, char **argv) {
                     close (pipe1[1]);
                     close (pipe2[1]);
                     FILE *reader = fdopen(pipe2[0], "rb");
-                    filename = "t1";
                     if (filename == NULL) {
                         FILE *file = stdout;
                         while(fgets(buffer, sizeof buffer, reader) != NULL) {
