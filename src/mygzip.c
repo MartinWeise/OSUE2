@@ -80,8 +80,8 @@ int main(int argc, char **argv) {
                     // child 2
                     char buffer[1024];
 //                    close (pipe1[0]);
+                    close (pipe1[0]);
                     close (pipe1[1]);
-                    close (pipe2[0]);
                     close (pipe2[1]);
                     FILE *reader = fdopen(pipe2[0], "rb");
                     filename = "t1";
