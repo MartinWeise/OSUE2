@@ -42,3 +42,13 @@ else
     echo "NOT OK"
     rm test/file test/file.gz
 fi
+
+echo "#### TEST 6 (stdout) ###"
+(echo "waddup" | src/mygzip) > output.gz
+gunzip output.gz
+if !(cat output | grep -q 'waddup'); then
+    echo "NOT OK"
+else
+    echo "OK"
+fi
+rm output
