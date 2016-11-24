@@ -5,8 +5,7 @@
  *
  * @brief Main program module.
  *
- * This program demonstrates Doxygen and prints among a few unimportant lines of ASCII text
- * "Hello World" out on stdout.
+ *
  **/
 
 #include <stdio.h>
@@ -17,20 +16,74 @@
 #include <memory.h>
 #include <sys/wait.h>
 #include <stdarg.h>
-#include "mygzip.h"
 
+
+/* === Macros === */
+
+/** The buffer size. */
 #define BUFFER_SIZE 512
 
+/**
+ * @brief Provides a debugging function to output status messages
+ * @details Activate/Deactivate by adding/removing -DENDEBUG to DEFS in Makefile.
+ */
+#if defined(ENDEBUG)
+#define DEBUG(...) do { fprintf(stderr, __VA_ARGS__); } while(0)
+#else
+#define DEBUG(...)
+#endif
+
+/* === Prototypes === */
+
+/**
+ * @brief Exit the program with a message, free resources and append an error
+ * message if available.
+ * @param fmt Format string like used in printf(fmt,...)
+ */
+static void error_exit (const char *fmt, ...);
+
+/**
+ * @brief Shows the information how to use the program properly when used wrong
+ */
+static void usage(void);
+
+/**
+ * @brief Frees resources being used by the program
+ * @details globals: input_writer, output, output_reader, pipe1, pipe2
+ */
+static void cleanup_resources(void);
+
+/**
+ * @brief Safely copy the content from @p from to @p to
+ * @details This is done in buckets of size BUFFER_SIZE, append last few bytes as well
+ * @param from File descriptor of source file.
+ * @param to File descriptor of target file.
+ */
+static void copy_contents (FILE *from, FILE *to);
+
+/** The program name, mygzip by default. */
 static char *progname = "mygzip";
-static char *filename = NULL;
+/** The file descriptor to write output to. */
 static FILE *output = NULL;
+/** Writer that is used for attaching stdin to pipe1.  */
 static FILE *input_writer = NULL;
+/** Reader that is used for attaching pipe2 to the output file. */
 static FILE *output_reader = NULL;
+/** The input pipe. */
 static int pipe1[2];
+/** The output pipe. */
 static int pipe2[2];
+/** Process ID of child 1. */
 static pid_t child1;
+/** Process ID of child 2. */
 static pid_t child2;
 
+/**
+ * The program entry point.
+ * @param argc The argument counter.
+ * @param argv The argument vector.
+ * @return EXIT_SUCCESS | EXIT_FAILURE depending on the usage against the specification.
+ */
 int main(int argc, char **argv) {
 
     /* check arguments of program */
@@ -40,14 +93,13 @@ int main(int argc, char **argv) {
         usage();
     }
     if (argc == 2) {
-        filename = argv[1];
         /* try open the file */
-        if ((output = fopen(filename, "w")) == NULL) {
-            error_exit("Couldn't open the file %s.", filename);
+        if ((output = fopen(argv[1], "w")) == NULL) {
+            error_exit("Couldn't open the file %s.", argv[1]);
         }
     }
 
-    /* create pipes */
+    /* create pipe 1 */
     if (pipe(&pipe2[0]) == -1) {
         error_exit("Couldn't create second pipe.");
     }
@@ -77,7 +129,7 @@ int main(int argc, char **argv) {
             exit (EXIT_SUCCESS);
             break;
         default:
-            // parent
+            /* parent, continue from here with fork of child 1 */
             break;
     }
 
@@ -107,7 +159,7 @@ int main(int argc, char **argv) {
             error_exit("Couldn't execute with execlp.");
             break;
         default:
-            // parent
+            /* parent, continue from here */
             break;
     }
 
@@ -116,8 +168,6 @@ int main(int argc, char **argv) {
         error_exit("Something went wrong. Child ran away to parent section.");
     }
 
-    DEBUG("pid: %d\n",getpid());
-
     close (pipe1[0]);
     close (pipe2[0]);
     close (pipe2[1]);
@@ -125,6 +175,7 @@ int main(int argc, char **argv) {
     if ((input_writer = fdopen(pipe1[1], "w")) == NULL) {
         error_exit("Couldn't open first pipe for writing.");
     }
+
     copy_contents(stdin, input_writer);
 
     if (fclose (input_writer) == EOF) {
@@ -137,10 +188,9 @@ int main(int argc, char **argv) {
     int status;
     pid_t pid;
 
-    for (int i=1; i <=2; i++) {
+    for (int i = 1; i <= 2; i++) {
         pid = wait(&status);
     }
-
     if (output == stdout) {
         printf("\n");
     }
@@ -152,6 +202,7 @@ static void copy_contents (FILE *from, FILE *to) {
     uint8_t buffer[BUFFER_SIZE];
     int length;
 
+    /* TODO: comment here */
     while ((length = fread(&buffer, sizeof buffer[0], BUFFER_SIZE, from)) == BUFFER_SIZE) {
         if ( fwrite(&buffer, sizeof (buffer[0]), BUFFER_SIZE, to) < BUFFER_SIZE) {
             error_exit("Couldn't write to target.");

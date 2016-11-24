@@ -1,7 +1,13 @@
+#
+# \file Makefile
+# \author Martin Weise <e1429167@student.tuwien.ac.at>
+# \date 22.11.2016
+# \brief Main program module.
+#
+
 CC=gcc
 DEFS=-D_XOPEN_SOURCE=500 -D_BSD_SOURCE
 CFLAGS=-Wall -g -std=c99 -pedantic $(DEFS)
-# debug: to DEFS:    -DENDEBUG
 #LDFLAGS=-lcrypt
 
 all: src/mygzip
