@@ -14,4 +14,4 @@ static void usage(void);
 
 static void cleanup_resources(void);
 
-static void copy_contents (FILE *source, FILE *target);
+static void copy_contents (FILE *from, FILE *to);

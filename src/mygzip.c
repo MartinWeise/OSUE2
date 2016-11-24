@@ -42,15 +42,12 @@ int main(int argc, char **argv) {
     if (argc == 2) {
         filename = argv[1];
         /* try open the file */
-        if ((output = fopen(filename, "r")) == NULL) {
+        if ((output = fopen(filename, "w")) == NULL) {
             error_exit("Couldn't open the file %s.", filename);
         }
     }
 
     /* create pipes */
-    if (pipe(&pipe1[0]) == -1) {
-        error_exit("Couldn't create first pipe.");
-    }
     if (pipe(&pipe2[0]) == -1) {
         error_exit("Couldn't create second pipe.");
     }
@@ -82,6 +79,11 @@ int main(int argc, char **argv) {
         default:
             // parent
             break;
+    }
+
+    /* IMPORTANT: Create pipe here not above with other! */
+    if (pipe(&pipe1[0]) == -1) {
+        error_exit("Couldn't create first pipe.");
     }
 
     /* fork for first child */
@@ -131,7 +133,17 @@ int main(int argc, char **argv) {
     input_writer = NULL;
     close (pipe1[1]);
 
-    /* wait for children and check their exit codes */
+    /* wait for children to come home to parent */
+    int status;
+    pid_t pid;
+
+    for (int i=1; i <=2; i++) {
+        pid = wait(&status);
+    }
+
+    if (output == stdout) {
+        printf("\n");
+    }
 
     return EXIT_SUCCESS;
 }
