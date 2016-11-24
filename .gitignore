@@ -4,9 +4,7 @@ mygzip.o
 .idea/
 doc/html/
 doc/latex/
-solution
-solution.c
-sandbox.c
-sandbox
+sandbox*
 *gz
 *bin
+richtlinien.sh
