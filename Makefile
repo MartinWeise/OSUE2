@@ -1,6 +1,7 @@
 CC=gcc
-DEFS=-D_XOPEN_SOURCE=500 -D_BSD_SOURCE -DENDEBUG
+DEFS=-D_XOPEN_SOURCE=500 -D_BSD_SOURCE
 CFLAGS=-Wall -g -std=c99 -pedantic $(DEFS)
+# debug: to DEFS:    -DENDEBUG
 #LDFLAGS=-lcrypt
 
 all: src/mygzip
