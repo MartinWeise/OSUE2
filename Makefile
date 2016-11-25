@@ -24,8 +24,11 @@ test: all
 run: all
 	src/mygzip
 
-doxygen: all
+doc: all
 	sh doc/batch.sh
+
+zip: all
+	tar -cvzf osue-lab2.tgz Makefile src/mygzip.c doc/Doxyfile
 
 clean:
 	rm -f src/mygzip src/mygzip.o

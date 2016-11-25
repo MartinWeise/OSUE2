@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# @file test.sh
+# @author Martin Weise <e1429167@student.tuwien.ac.at>
+# @date 25.11.2016
+#
+# @brief Contains 6 simple testcases to quick-check the program
+#        against the task description.
 
 echo "### TEST 1 (executable) ###"
 if : | src/mygzip | grep -q 'X'; then
@@ -10,18 +16,27 @@ fi
 
 
 echo "### TEST 2 (argcount 1) ###"
-: | src/mygzip test/t1
-echo "OK"
-rm test/t1
-
-
-echo "### TEST 3 (argcount 2, should fail) ###"
-if : | src/mygzip test/t2 test/t3 | grep -q 'usage'; then
-    echo "OK"
+if echo "Hello waddup" | src/mygzip test/t1.gz | grep -q ''; then
+    gunzip test/t1.gz
+    if cat test/t1 | grep -q 'Hello waddup'; then
+        echo "OK"
+    else
+        echo "NOT OK 2"
+    fi
 else
     echo "NOT OK"
 fi
-rm test/t2 test/t3
+rm test/t1
+
+
+echo "### TEST 3 (argcount 2) ###"
+#                                 vv pipe sterr to stdout & stdout to /dev/null
+if : | src/mygzip test/t2 test/t3 2>&1 >/dev/null | grep -q 'USAGE'; then
+    echo "OK"
+else
+    rm test/t2 test/t3
+    echo "NOT OK"
+fi
 
 
 echo "### TEST 4 (input) ###"

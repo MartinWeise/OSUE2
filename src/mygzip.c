@@ -16,12 +16,15 @@
 #include <memory.h>
 #include <sys/wait.h>
 #include <stdarg.h>
+#include <assert.h>
 
 
-/* === Macros === */
+/* === Constants === */
 
 /** The buffer size. */
 #define BUFFER_SIZE 512
+
+/* === Macros === */
 
 /**
  * @brief Provides a debugging function to output status messages
@@ -61,22 +64,26 @@ static void cleanup_resources(void);
  */
 static void copy_contents (FILE *from, FILE *to);
 
-/** The program name, mygzip by default. */
+/* === Global Variables === */
+
+/** @brief The program name, mygzip by default. */
 static char *progname = "mygzip";
-/** The file descriptor to write output to. */
+/** @brief The file descriptor to write output to. */
 static FILE *output = NULL;
-/** Writer that is used for attaching stdin to pipe1.  */
+/** @brief Writer that is used for attaching stdin to pipe1.  */
 static FILE *input_writer = NULL;
-/** Reader that is used for attaching pipe2 to the output file. */
+/** @brief Reader that is used for attaching pipe2 to the output file. */
 static FILE *output_reader = NULL;
-/** The input pipe. */
+/** @brief The input pipe. */
 static int pipe1[2];
-/** The output pipe. */
+/** @brief The output pipe. */
 static int pipe2[2];
-/** Process ID of child 1. */
+/** @brief Process ID of child 1. */
 static pid_t child1;
-/** Process ID of child 2. */
+/** @brief Process ID of child 2. */
 static pid_t child2;
+
+/* === Implementations === */
 
 /**
  * The program entry point.
@@ -188,11 +195,16 @@ int main(int argc, char **argv) {
     int status;
     pid_t pid;
 
+    /* check exit codes of children */
     for (int i = 1; i <= 2; i++) {
         pid = wait(&status);
-    }
-    if (output == stdout) {
-        printf("\n");
+        if (pid == child1 && WEXITSTATUS(status) != EXIT_SUCCESS) {
+            error_exit("Child 1 returned with an error (gzip).");
+        } else if (pid == child2 && WEXITSTATUS(status) != EXIT_SUCCESS) {
+            error_exit("Child 2 returned with an error (pipes).");
+        } else if (pid != child1 && pid != child2) {
+            error_exit("Couldn't wait for children.");
+        }
     }
 
     return EXIT_SUCCESS;
@@ -202,10 +214,10 @@ static void copy_contents (FILE *from, FILE *to) {
     uint8_t buffer[BUFFER_SIZE];
     int length;
 
-    /* TODO: comment here */
+    /* read buffer-wise from source file and write buffer-wise to target file */
     while ((length = fread(&buffer, sizeof buffer[0], BUFFER_SIZE, from)) == BUFFER_SIZE) {
-        if ( fwrite(&buffer, sizeof (buffer[0]), BUFFER_SIZE, to) < BUFFER_SIZE) {
-            error_exit("Couldn't write to target.");
+        if (fwrite(&buffer, sizeof (buffer[0]), BUFFER_SIZE, to) < BUFFER_SIZE) {
+            error_exit("Couldn't write full buffer to target.");
         }
     }
     /* check for errors in stream */
