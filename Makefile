@@ -2,7 +2,8 @@
 # \file Makefile
 # \author Martin Weise <e1429167@student.tuwien.ac.at>
 # \date 22.11.2016
-# \brief Main program module.
+# \brief The Makefile.
+# \details Add -DENDEBUG to \p DEFS to enable debugging.
 #
 
 CC=gcc
@@ -17,18 +18,6 @@ src/mygzip: src/mygzip.o
 
 src/mygzip.o: src/mygzip.c
 	$(CC) $(CFLAGS) -c -o $@ $<
-
-test: all
-	sh test/test.sh
-
-run: all
-	src/mygzip
-
-doc: all
-	sh doc/batch.sh
-
-zip: all
-	tar -cvzf osue-lab2.tgz Makefile src/mygzip.c doc/Doxyfile
 
 clean:
 	rm -f src/mygzip src/mygzip.o

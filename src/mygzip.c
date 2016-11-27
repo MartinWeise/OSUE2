@@ -5,7 +5,6 @@
  *
  * @brief Main program module.
  *
- *
  **/
 
 #include <stdio.h>
@@ -47,6 +46,7 @@ static void error_exit (const char *fmt, ...);
 
 /**
  * @brief Shows the information how to use the program properly when used wrong
+ * @details globals: progname
  */
 static void usage(void);
 
@@ -66,8 +66,8 @@ static void copy_contents (FILE *from, FILE *to);
 
 /* === Global Variables === */
 
-/** @brief The program name, mygzip by default. */
-static char *progname = "mygzip";
+/** @brief The program name. */
+static char *progname;
 /** @brief The file descriptor to write output to. */
 static FILE *output = NULL;
 /** @brief Writer that is used for attaching stdin to pipe1.  */
@@ -86,7 +86,7 @@ static pid_t child2;
 /* === Implementations === */
 
 /**
- * The program entry point.
+ * @brief The program entry point.
  * @param argc The argument counter.
  * @param argv The argument vector.
  * @return EXIT_SUCCESS | EXIT_FAILURE depending on the usage against the specification.
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
         case 0:
             // child 2
             DEBUG("Child 2 was born.\n");
-            close (pipe2[1]);
+            (void) close (pipe2[1]);
 
             if ((output_reader = fdopen(pipe2[0], "r")) == NULL) {
                 error_exit("Couldn't fdopen pipe2.");
@@ -130,8 +130,8 @@ int main(int argc, char **argv) {
             if (fclose(output) == EOF) {
                 error_exit("Couldn't close output file.");
             }
-            fclose (output_reader);
-            close (pipe2[0]);
+            (void) fclose (output_reader);
+            (void) close (pipe2[0]);
 
             exit (EXIT_SUCCESS);
             break;
@@ -153,8 +153,8 @@ int main(int argc, char **argv) {
         case 0:
             // child 1
             DEBUG("Child 1 was born.\n");
-            close (pipe1[1]);
-            close (pipe2[0]);
+            (void) close (pipe1[1]);
+            (void) close (pipe2[0]);
             if (dup2(pipe1[0], fileno(stdin)) == -1) {
                 error_exit("Couldn't bind stdin to pipe1.");
             }
@@ -163,6 +163,7 @@ int main(int argc, char **argv) {
             }
             DEBUG("Starting GZIP.\n");
             execlp("gzip", "gzip", "-cf", (char *) 0);
+            /* when the execlp function returns, an error will have occured. */
             error_exit("Couldn't execute with execlp.");
             break;
         default:
@@ -175,9 +176,9 @@ int main(int argc, char **argv) {
         error_exit("Something went wrong. Child ran away to parent section.");
     }
 
-    close (pipe1[0]);
-    close (pipe2[0]);
-    close (pipe2[1]);
+    (void) close (pipe1[0]);
+    (void) close (pipe2[0]);
+    (void) close (pipe2[1]);
 
     if ((input_writer = fdopen(pipe1[1], "w")) == NULL) {
         error_exit("Couldn't open first pipe for writing.");
@@ -188,8 +189,8 @@ int main(int argc, char **argv) {
     if (fclose (input_writer) == EOF) {
         error_exit("Couldn't close input writer.");
     }
-    input_writer = NULL;
-    close (pipe1[1]);
+    //input_writer = NULL;
+    (void) close (pipe1[1]);
 
     /* wait for children to come home to parent */
     int status;
@@ -257,23 +258,23 @@ static void error_exit (const char *fmt, ...) {
 }
 
 static void usage(void) {
-    fprintf (stderr, "USAGE: %s [file]\n", progname);
+    (void) fprintf (stderr, "USAGE: %s [file]\n", progname);
     exit (EXIT_FAILURE);
 }
 
 static void cleanup_resources(void) {
     DEBUG("Freeing resources\n");
     if (output != NULL) {
-        fclose(output);
+        (void) fclose(output);
     }
     if (input_writer != NULL) {
-        fclose (input_writer);
+        (void) fclose (input_writer);
     }
     if (output_reader != NULL) {
-        fclose (input_writer);
+        (void) fclose (input_writer);
     }
-    close(pipe1[0]);
-    close(pipe1[1]);
-    close(pipe2[0]);
-    close(pipe2[1]);
+    (void) close(pipe1[0]);
+    (void) close(pipe1[1]);
+    (void) close(pipe2[0]);
+    (void) close(pipe2[1]);
 }
